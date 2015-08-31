@@ -1,0 +1,103 @@
+#include <stdio.h>
+#include<vector>
+#include <iostream>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/highgui/highgui.hpp>
+using namespace cv;
+using namespace std;
+
+vector<string> imageadress;
+void readimageadresses();
+
+int main( int argc, char** argv )
+{
+    char a;
+    readimageadresses();
+    vector<vector<Point3f> > object_points;
+    vector<vector<Point2f> > image_points;
+    vector<Point2f> corners;
+    Size board_sz = Size(9, 6);
+    Mat image;
+    Mat gray_image;
+    vector<Point3f> obj;
+    int successes=0;
+    for(int j=0;j<54;j++)
+        obj.push_back(Point3f(j/6, j%9, 0.0f));
+    for(std::vector<string>::iterator it = imageadress.begin() ; it != imageadress.end(); ++it){
+        image = imread(*it, CV_LOAD_IMAGE_COLOR);
+        if(!image.data)
+        {
+            cout <<  "Could not open or find the image" << std::endl ;
+            return -1;
+        }
+        bool found = findChessboardCorners(image, board_sz, corners, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+        if(found){
+            cvtColor(image, gray_image, CV_BGR2GRAY);
+            cornerSubPix(gray_image, corners, Size(11, 11), Size(-1, -1), TermCriteria(CV_TERMCRIT_EPS, 10, 0.1));
+	    std::cout << "OpenCV found the corners \n";
+            image_points.push_back(corners);
+            object_points.push_back(obj);
+            successes=successes+1;
+        }
+        else{
+	    std::cout << "OpenCV did not find the corners\n";
+        }
+    }
+    double error2;
+    Mat intrinsic = Mat(3, 3, CV_32FC1);
+    Mat distCoeffs;
+    vector<Mat> rvecs;
+    vector<Mat> tvecs;
+    intrinsic.ptr<float>(0)[0] = 1;
+    intrinsic.ptr<float>(1)[1] = 1;
+    error2=calibrateCamera(object_points, image_points, image.size(), intrinsic, distCoeffs, rvecs, tvecs);
+    Mat imageUndistorted;
+    vector<vector<Point2f> > imageUndistorted_points;
+    for(std::vector<string>::iterator it = imageadress.begin() ; it != imageadress.end(); ++it)
+    {
+        image = imread(*it, CV_LOAD_IMAGE_COLOR);
+        undistort(image, imageUndistorted, intrinsic, distCoeffs);
+	bool found=findChessboardCorners(imageUndistorted, board_sz, corners, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+        if(found){
+            drawChessboardCorners(imageUndistorted, board_sz, corners, 1);
+            imshow("win1", imageUndistorted); 
+            int key = waitKey(1000);
+            imageUndistorted_points.push_back(corners);
+	}
+    }
+    float error=0;
+    vector<Point2f> projected_points;
+    for(int i1 =0 ; i1<successes ; i1++){
+        projectPoints(object_points[i1], rvecs[i1], tvecs[i1], intrinsic, distCoeffs, projected_points);
+        for(int i2=0; i2<54; i2++){
+            error=error+(((projected_points[i2].x)-(image_points[i1][i2].x))/(image_points[i1][i2].x))*(((projected_points[i2].x)-(image_points[i1][i2].x))/(image_points[i1][i2].x));
+            error=error+(((projected_points[i2].y)-(image_points[i1][i2].y))/(image_points[i1][i2].y))*(((projected_points[i2].y)-(image_points[i1][i2].y))/(image_points[i1][i2].y));
+        }
+    }
+    error=error/(54*successes);
+    error2=error2/(54*successes);
+    std::cout << intrinsic << "\n";
+    std::cout << "Square error " << error << "\n";
+    std::cout << "Square error " << error2 << "\n";
+    return 0;
+}
+void readimageadresses(){
+    imageadress.push_back("data/left01.jpg");
+    imageadress.push_back("data/left02.jpg");
+    imageadress.push_back("data/left03.jpg");
+    imageadress.push_back("data/left04.jpg");
+    imageadress.push_back("data/left05.jpg");
+    imageadress.push_back("data/left06.jpg");
+    imageadress.push_back("data/left07.jpg");
+    imageadress.push_back("data/left08.jpg");
+    imageadress.push_back("data/left09.jpg");
+    imageadress.push_back("data/left10.jpg");
+    imageadress.push_back("data/left11.jpg");
+    imageadress.push_back("data/left12.jpg");
+    imageadress.push_back("data/left13.jpg");
+    imageadress.push_back("data/left14.jpg");
+}
